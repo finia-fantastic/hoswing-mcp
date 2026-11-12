@@ -105,6 +105,10 @@ export function mediaInfo(file) {
 export function buildNode(job, shot, index, assets) {
   const references = [...new Set([...shot.referenceAssetVersionIds,...shot.references.map(p=>assets[p].assetVersionId),...[shot.firstFrame,shot.lastFrame].filter(Boolean).map(p=>assets[p].assetVersionId)])];
   const mediaKinds = Object.fromEntries(Object.values(assets).map(a=>[a.assetVersionId,a.kind.toLowerCase()]));
+  // 网站把参考视频放在独立字段：videoReferenceAssetVersionIds。
+  // 混进 referenceAssetVersionIds 会被上游当成非法输入（实测 5s 测试任务受理失败）。
+  const videoReferences = references.filter(id=>mediaKinds[id]==='video');
+  const imageReferences = references.filter(id=>mediaKinds[id]!=='video');
   const parameters = {...job.parameters,aspectRatio:shot.aspectRatio,...job.mode==='video'?{durationSeconds:shot.durationSeconds}:{count:1}};
   return {
     id:`mcp-${job.id.slice(-12)}-${String(index+1).padStart(3,'0')}`,type:'studio',version:1,
@@ -112,7 +116,8 @@ export function buildNode(job, shot, index, assets) {
     data:{kind:job.mode==='image'?'prompt-image':'prompt-video',label:shot.title,description:shot.title,
       prompt:shot.prompt,status:'ready',version:1,projectId:job.projectId,locked:false,
       modelProvider:job.provider,modelId:job.modelId,modelOperation:job.operation,modelParameters:parameters,
-      referenceAssetVersionIds:references,referenceMediaKinds:mediaKinds,
+      referenceAssetVersionIds:imageReferences,referenceMediaKinds:mediaKinds,
+      ...(videoReferences.length?{videoReferenceAssetVersionIds:videoReferences}:{}),
       ...(shot.firstFrame?{firstFrameAssetVersionId:assets[shot.firstFrame].assetVersionId}:{}),
       ...(shot.lastFrame?{lastFrameAssetVersionId:assets[shot.lastFrame].assetVersionId}:{}),
       ...(job.mode==='image'?{imageGenerationMode:references.length?'image-to-image':'text-to-image'}:{})}

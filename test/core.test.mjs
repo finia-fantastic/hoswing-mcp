@@ -118,3 +118,18 @@ test('画布读回的键顺序变化不算节点被改过', async () => {
   assert.notEqual(stable(written), stable({ count: 2, aspectRatio: '16:9' }))
   assert.notEqual(stable({ a: [1, 2] }), stable({ a: [2, 1] }))
 })
+
+test('参考视频要放进 videoReferenceAssetVersionIds，不能混进图片参考', async () => {
+  const { buildNode } = await import('../src/core.mjs')
+  const job = { id:'job-test-123456789012', projectId:'p1', mode:'video', provider:'relay-x',
+    modelId:'doubao-seedance-2-5-260628', operation:'video.generate', parameters:{}, origin:{x:0,y:0} }
+  const shot = { id:'S1', title:'t', prompt:'换人', aspectRatio:'9:16', durationSeconds:5,
+    references:['/a/vid.mp4','/a/img.jpg'], referenceAssetVersionIds:[], firstFrame:undefined, lastFrame:undefined }
+  const assets = { '/a/vid.mp4':{assetVersionId:'vid-1',kind:'VIDEO'},
+                   '/a/img.jpg':{assetVersionId:'img-1',kind:'IMAGE'} }
+  const node = buildNode(job, shot, 0, assets)
+  const d = node.data
+  assert.deepEqual(d.videoReferenceAssetVersionIds, ['vid-1'])
+  assert.deepEqual(d.referenceAssetVersionIds, ['img-1'])
+  assert.equal(d.referenceMediaKinds['vid-1'], 'video')
+})
